@@ -28,12 +28,13 @@ func NewElement(raw string) (*Element, error) {
 	//Continuing parsing the next parameter until the string is consumed
 	for index < len(raw) {
 		//parameters take the form name="value" and separated by spaces
-		equals := strings.Index(raw[index:], "=")
+		equals := strings.Index(raw[index:], "=") + index
 		openQuote := -1
 
 		if equals != -1 {
-			openQuote = strings.Index(raw[equals:], "\"")
+			openQuote = strings.Index(raw[equals:], "\"") + equals
 		}
+
 		//quotes can be escaped, search for an unescaped closing
 		endQuote := findEndQuote(raw, openQuote+1)
 
@@ -51,10 +52,10 @@ func NewElement(raw string) (*Element, error) {
 }
 
 func findEndQuote(raw string, index int) int {
-	//continue searching while it isn't the end of the string, and the
+	//continue searching while a candidate location is present, and the
 	//current and previous chars don't equal \"
-	for index != -1 && !(raw[index] == '"' && raw[index-1] == '\'') {
-		index = strings.Index(raw[index+1:], "\"")
+	for index != -1 && raw[index] != '"' && raw[index-1] != '\'' {
+		index++
 	}
 
 	return index

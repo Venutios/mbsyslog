@@ -1,8 +1,10 @@
 package mbsyslog
 
 import (
-	"fmt"
 	"net"
+	"sync"
+	"sync/atomic"
+	"time"
 )
 
 //Server is a syslog server that forms the basis for a relay or collector in
@@ -10,97 +12,61 @@ import (
 type Server struct {
 	maxMessageSize int
 	port           int
+	stopChan       chan struct{}
+	running        int32
+	messagesOut    chan<- Message
 }
 
 //NewServer prepares the server to listen for messages. The server will listen
-//on port 514 and have an 8KB buffer.
-func NewServer() *Server {
+//on port 514 and have an 8KB maximum message size. The message channel will
+//receive all messages received, whether valid or invalid. The channel should
+//not be closed until the server is not running by calling Running().
+func NewServer(messageChan chan<- Message) *Server {
 	result := new(Server)
 	result.port = 514
 	result.maxMessageSize = 8192
+	result.messagesOut = messageChan
+	result.stopChan = make(chan struct{}, 1)
+	result.running = 0
 	return result
 }
 
-//Listen starts the server accepting syslog messages
-func (s Server) Listen() error {
+//Listen starts the server accepting syslog messages. The server will not stop
+//until the Stop() method is called, and all outstanding parsers have chance to
+//finish processing and write their message to the output channel.
+func (s *Server) Listen() error {
+	var wg sync.WaitGroup
+
 	conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: []byte{0, 0, 0, 0}, Port: s.port, Zone: ""})
 	if err != nil {
 		return err
 	}
+
+	s.setRunning(true)
+	//defer evalaute as a stack, when stopping close the socket, wait for
+	//all gorountines to finish parsing, and then signal the server is stopped
+	defer func() { s.setRunning(false) }()
+	defer wg.Wait()
 	defer conn.Close()
 
 	buffer := make([]byte, s.maxMessageSize)
 	for {
-		count, addr, err := conn.ReadFromUDP(buffer)
-		if err != nil {
-			return err
+		select {
+		case <-s.stopChan: //supposed to stop, everything is deferred above
+			return nil
+		default:
+			conn.SetDeadline(time.Now().Add(1 * time.Second))
+			count, addr, err := conn.ReadFromUDP(buffer)
+			if err == nil {
+				wg.Add(1)
+				go func(data []byte) {
+					defer wg.Done()
+					s.messagesOut <- *NewMessage(addr, data)
+				}(buffer[0:count])
+			}
 		}
-		fmt.Println("Message from " + addr.String())
-		go func(data []byte) {
-			message := NewMessage(data)
-			fmt.Println(message.String())
-		}(buffer[0:count])
 	}
 }
-
-/**
- * Starts the server accepting messages until the server is requested to
- * stop. Run doesn't return until the server has been stopped. Events will
- * be triggered in multiple separate threads.
- */
-// @Override
-// public void run() {
-//     stop = false;
-//     running = true;
-
-//     ExecutorService taskExec = Executors.newCachedThreadPool();
-
-//     while (!stop) {
-//         //Create a new packet to receive the next message
-//         DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-
-//         try {
-//             //listen until the next message is received
-//             socket.receive(packet);
-
-//             //Decode the packet into a message
-//             Message m = new Message(packet);
-
-//             //Call each listener passing it to the thread pool for execution
-//             synchronized (messageMonitor) {
-//                 taskExec.submit(() -> {
-//                     messageListeners.forEach(listener -> listener.onMessageEvent(m));
-//                 });
-//             }
-//         } catch (SocketTimeoutException ex) {
-//             //ignore, the exception, lets the loop poll for the stop flag
-//         } catch (IOException ex) {
-//             //Call each listener passing it to the thread pool for execution
-//             synchronized (errorMonitor) {
-//                 taskExec.submit(() -> {
-//                     errorListeners.forEach(listener -> listener.onErrorEvent(ex,
-//                             Thread.currentThread().getStackTrace()[1].getClassName() + "."
-//                             + Thread.currentThread().getStackTrace()[1].getMethodName() + " on line "
-//                             + Thread.currentThread().getStackTrace()[1].getLineNumber()));
-//                 });
-//             }
-//         }
-//     }
-//     //stop accepting messages
-//     socket.close();
-
-//     //stop accepting new tasks and wait for all tasks to complete
-//     taskExec.shutdown();
-//     while (!taskExec.isTerminated()) {
-//         try {
-//             taskExec.awaitTermination(1, TimeUnit.MINUTES);
-//         } catch (InterruptedException ex) {
-//             //ignore the timeout, and keep waiting if necessary
-//         }
-//     }
-
-//     running = false;
-// }
 
 //Port that the server is configured to listen on
 func (s Server) Port() int {
@@ -110,4 +76,25 @@ func (s Server) Port() int {
 //MaximumMessageSize is the largest syslog message that can be accepted.
 func (s Server) MaximumMessageSize() int {
 	return s.maxMessageSize
+}
+
+//Stop signals the server to shutdown, but doesn't stop immediately
+func (s *Server) Stop() {
+	s.stopChan <- *new(struct{})
+}
+
+//Running returns if the server is currently accepting syslog messages or not
+func (s *Server) Running() bool {
+	if atomic.LoadInt32(&s.running) == 1 {
+		return true
+	}
+	return false
+}
+
+func (s *Server) setRunning(val bool) {
+	if val {
+		atomic.StoreInt32(&s.running, 1)
+	} else {
+		atomic.StoreInt32(&s.running, 0)
+	}
 }

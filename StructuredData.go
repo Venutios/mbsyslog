@@ -17,9 +17,9 @@ func NewStructuredData() *StructuredData {
 	return result
 }
 
-func (sd StructuredData) addElement(raw string) bool {
+func (sd *StructuredData) addElement(raw string) bool {
 	e, err := NewElement(raw)
-	if err != nil {
+	if err == nil {
 		sd.elements = append(sd.elements, e)
 		return true
 	}
@@ -33,6 +33,6 @@ func (sd StructuredData) Count() int {
 }
 
 //Element returns an element from the structured data
-func (sd StructuredData) Element(index int) *Element {
-	return sd.elements[index]
+func (sd StructuredData) Element(index int) Element {
+	return *sd.elements[index]
 }

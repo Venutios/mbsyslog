@@ -53,3 +53,58 @@ const (
 	//MessageFacilityLocal7 is for local use 7
 	MessageFacilityLocal7
 )
+
+func (mf MessageFacility) String() string {
+	switch mf {
+	case MessageFacilityKernel:
+		return "MessageFacilityKernel"
+	case MessageFacilityUser:
+		return "MessageFacilityUser"
+	case MessageFacilityMail:
+		return "MessageFacilityMail"
+	case MessageFacilitySystem:
+		return "MessageFacilitySystem"
+	case MessageFacilityAuth:
+		return "MessageFacilityAuth"
+	case MessageFacilitySyslog:
+		return "MessageFacilitySyslog"
+	case MessageFacilityPrinter:
+		return "MessageFacilityPrinter"
+	case MessageFacilityNews:
+		return "MessageFacilityNews"
+	case MessageFacilityUUCP:
+		return "MessageFacilityUUCP"
+	case MessageFacilityCron:
+		return "MessageFacilityCron"
+	case MessageFacilitySecurity:
+		return "MessageFacilitySecurity"
+	case MessageFacilityFTP:
+		return "MessageFacilityFTP"
+	case MessageFacilityNTP:
+		return "MessageFacilityNTP"
+	case MessageFacilityLogAudit:
+		return "MessageFacilityLogAudit"
+	case MessageFacilityLogAlert:
+		return "MessageFacilityLogAlert"
+	case MessageFacilityClock:
+		return "MessageFacilityClock"
+	case MessageFacilityLocal0:
+		return "MessageFacilityLocal0"
+	case MessageFacilityLocal1:
+		return "MessageFacilityLocal1"
+	case MessageFacilityLocal2:
+		return "MessageFacilityLocal2"
+	case MessageFacilityLocal3:
+		return "MessageFacilityLocal3"
+	case MessageFacilityLocal4:
+		return "MessageFacilityLocal4"
+	case MessageFacilityLocal5:
+		return "MessageFacilityLocal5"
+	case MessageFacilityLocal6:
+		return "MessageFacilityLocal6"
+	case MessageFacilityLocal7:
+		return "MessageFacilityLocal7"
+	default:
+		return "Unknown"
+	}
+}

@@ -2,6 +2,7 @@ package mbsyslog
 
 import (
 	"errors"
+	"net"
 	"strconv"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 //
 //	<priority>content
 type Message struct {
+	source         *net.UDPAddr
 	raw            string
 	valid          bool
 	format         MessageFormat
@@ -22,19 +24,25 @@ type Message struct {
 	hostname       string
 	application    string
 	processID      int
-	messageID      int
-	structuredData *StructuredData
+	messageID      string
+	structuredData StructuredData
 	content        string
 }
 
 //NewMessage parses a syslog message into the component pieces
-func NewMessage(data []byte) *Message {
+func NewMessage(source *net.UDPAddr, data []byte) *Message {
 	result := new(Message)
+	result.source = source
 	result.parse(string(data))
 	return result
 }
 
-//Valid returns if the messsage parsing was successful and the message was valid
+//Source returns UDP address source of the message
+func (m Message) Source() net.UDPAddr {
+	return *m.source
+}
+
+//Valid returns if the messsage parsing was successful and the message is valid
 func (m Message) Valid() bool {
 	return m.valid
 }
@@ -59,34 +67,41 @@ func (m Message) Severity() MessageSeverity {
 	return MessageSeverity(int(m.priority) % 8)
 }
 
-//Version of the syslog protocol for the message
+//Version of the syslog protocol for the message. Formats that don't use the
+//version will be set to -1
 func (m Message) Version() int {
 	return m.version
 }
 
-//Date and time of the message
+//Date and time of the message. If no date and time was found, the default time
+//of time.Time{} is returned
 func (m Message) Date() time.Time {
 	return m.date
 }
 
-//Hostname for the message
+//Hostname for the message, or the empty string if not present
 func (m Message) Hostname() string {
 	return m.hostname
 }
 
-//Application for the message
+//Application for the message, or the empty string if not present
 func (m Message) Application() string {
 	return m.application
 }
 
-//ProcessID for the message
+//ProcessID for the message, or -1 if the process ID was not present
 func (m Message) ProcessID() int {
 	return m.processID
 }
 
-//MessageID for the message
-func (m Message) MessageID() int {
+//MessageID for the message, or the empty string if not present
+func (m Message) MessageID() string {
 	return m.messageID
+}
+
+//StructuredData of the message
+func (m Message) StructuredData() StructuredData {
+	return m.structuredData
 }
 
 //Content of the message
@@ -96,17 +111,19 @@ func (m Message) Content() string {
 
 //String returns a string representation of the message
 func (m Message) String() string {
-	return m.raw
+	return m.source.IP.String() + " " + m.raw
 }
 
-func (m Message) parse(data string) {
+func (m *Message) parse(data string) {
 	var err error
 	index := 0
 
 	//Assume the parsing will succeed, and set the defaults
 	m.valid = true
-	m.format = MessageFormatSimple
 	m.raw = data
+	m.format = MessageFormatSimple
+	m.version = -1
+	m.processID = -1
 
 	//Parse the pieces in order. Index is adjusted through the raw data as
 	//pieces are parsed. Optional pieces must preserve the index if the data
@@ -146,7 +163,7 @@ func (m Message) parse(data string) {
 	}
 }
 
-func (m Message) parsePriority() (int, error) {
+func (m *Message) parsePriority() (int, error) {
 	//No data, the message is not valid
 	if len(m.raw) < 1 {
 		m.valid = false
@@ -169,7 +186,7 @@ func (m Message) parsePriority() (int, error) {
 	return 0, errors.New("Failed to parse priority")
 }
 
-func (m Message) parseVersion(index int) (int, error) {
+func (m *Message) parseVersion(index int) (int, error) {
 	var err error
 
 	_, err = strconv.Atoi(string(m.raw[index]))
@@ -182,9 +199,9 @@ func (m Message) parseVersion(index int) (int, error) {
 	end := strings.Index(m.raw[index+1:], " ")
 	if end != -1 {
 		var err error
-		m.version, err = strconv.Atoi(m.raw[index:end])
+		m.version, err = strconv.Atoi(m.raw[index : index+end+1])
 		if err == nil {
-			return end + 1, nil
+			return index + end + 2, nil
 		}
 	}
 
@@ -192,7 +209,7 @@ func (m Message) parseVersion(index int) (int, error) {
 	return index, errors.New("Failed to parse version")
 }
 
-func (m Message) parseDate(index int) (int, error) {
+func (m *Message) parseDate(index int) (int, error) {
 	var err error
 
 	//if the current index is invalid, end parsing of the date
@@ -205,22 +222,41 @@ func (m Message) parseDate(index int) (int, error) {
 		return index + 2, nil
 	}
 
+	//Attempt the first supported date format
 	formatStr1 := "Jan 2 15:04:05"
-	m.date, err = time.Parse(formatStr1, m.raw[index:index+len(formatStr1)])
-	if err == nil {
-		return index + len(formatStr1) + 1, nil
+	spaceAfterDate := strings.Index(m.raw[index+len(formatStr1):], " ")
+	if spaceAfterDate != -1 {
+		m.date, err = time.Parse(formatStr1, m.raw[index:index+len(formatStr1)+spaceAfterDate])
+		if err == nil {
+			m.date = m.date.AddDate(time.Now().Year(), 0, 0)
+			return index + len(formatStr1) + spaceAfterDate + 1, nil
+		}
 	}
 
+	//Attempt the second supported date format
 	formatStr2 := "2006-01-02T15:04:05.000Z"
-	m.date, err = time.Parse(formatStr2, m.raw[index:index+len(formatStr2)])
-	if err == nil {
-		return index + len(formatStr2) + 1, nil
+	spaceAfterDate = strings.Index(m.raw[index+len(formatStr2):], " ")
+	if spaceAfterDate != -1 {
+		m.date, err = time.Parse(formatStr2, m.raw[index:index+len(formatStr2)+spaceAfterDate])
+		if err == nil {
+			return index + len(formatStr2) + spaceAfterDate + 1, nil
+		}
+	}
+
+	//Attemp the third support date format
+	formatStr3 := "2006-01-02T15:04:05.000000-07:00"
+	spaceAfterDate = strings.Index(m.raw[index+len(formatStr3):], " ")
+	if spaceAfterDate != -1 {
+		m.date, err = time.Parse(formatStr3, m.raw[index:index+len(formatStr3)+spaceAfterDate])
+		if err == nil {
+			return index + len(formatStr3) + spaceAfterDate + 1, nil
+		}
 	}
 
 	return index, errors.New("Failed to parse date")
 }
 
-func (m Message) parseHostname(index int) int {
+func (m *Message) parseHostname(index int) int {
 	if len(m.raw) <= index {
 		return index
 	}
@@ -233,13 +269,13 @@ func (m Message) parseHostname(index int) int {
 	//The hostname is separated from the next section by a space
 	end := strings.Index(m.raw[index+1:], " ")
 	if end != -1 {
-		m.hostname = m.raw[index:end]
-		return end + 1
+		m.hostname = m.raw[index : index+end+1]
+		return index + end + 2
 	}
 	return index
 }
 
-func (m Message) parseApplication(index int) int {
+func (m *Message) parseApplication(index int) int {
 	if len(m.raw) <= index {
 		return index
 	}
@@ -252,13 +288,13 @@ func (m Message) parseApplication(index int) int {
 	//The application is separated from the next section by a space
 	end := strings.Index(m.raw[index+1:], " ")
 	if end != -1 {
-		m.application = m.raw[index:end]
-		return end + 1
+		m.application = m.raw[index : index+end+1]
+		return index + end + 2
 	}
 	return index
 }
 
-func (m Message) parseProcessID(index int) int {
+func (m *Message) parseProcessID(index int) int {
 	//if the current index is invalid, end parsing
 	if len(m.raw) <= index {
 		m.valid = false
@@ -274,9 +310,9 @@ func (m Message) parseProcessID(index int) int {
 	end := strings.Index(m.raw[index+1:], " ")
 	if end != -1 {
 		var err error
-		m.processID, err = strconv.Atoi(m.raw[index:end])
+		m.processID, err = strconv.Atoi(m.raw[index : index+end+1])
 		if err == nil {
-			return end + 1
+			return index + end + 2
 		}
 	}
 
@@ -285,7 +321,7 @@ func (m Message) parseProcessID(index int) int {
 	return index
 }
 
-func (m Message) parseMessageID(index int) int {
+func (m *Message) parseMessageID(index int) int {
 	//if the current index is invalid, end parsing
 	if len(m.raw) <= index {
 		m.valid = false
@@ -300,21 +336,15 @@ func (m Message) parseMessageID(index int) int {
 	//The message ID is separated from the next section by a space
 	end := strings.Index(m.raw[index+1:], " ")
 	if end != -1 {
-		//parse the message ID and return
-		var err error
-		m.messageID, err = strconv.Atoi(m.raw[index:end])
-		if err != nil {
-			return end + 1
-		}
+		m.messageID = m.raw[index : index+end+1]
+		return index + end + 2
 	}
 	//Message ID parsing failed
 	m.valid = false
 	return index
 }
 
-func (m Message) parseStructuredData(index int) int {
-	elementIndex := index
-
+func (m *Message) parseStructuredData(index int) int {
 	//if the current index is invalid, end parsing
 	if len(m.raw) <= index {
 		m.valid = false
@@ -326,23 +356,23 @@ func (m Message) parseStructuredData(index int) int {
 		return index + 2
 	}
 
-	m.structuredData = NewStructuredData()
+	elementIndex := index
 
 	//Continue parsing the structured data until there are no more elements
-	for m.raw[elementIndex] == '[' {
-		endIndex := strings.Index(m.raw[elementIndex:], "]") + 1
+	for elementIndex < len(m.raw) && m.raw[elementIndex] == '[' {
+		endIndex := strings.Index(m.raw[elementIndex:], "]")
 		//if the end wasn't found, or the data couldnt be parsed, fail
-		if endIndex == 0 || m.structuredData.addElement(m.raw[elementIndex+1:endIndex]) == false {
+		if endIndex == -1 || m.structuredData.addElement(m.raw[elementIndex+1:elementIndex+endIndex]) == false {
 			m.valid = false
 			return index
 		}
-		elementIndex = endIndex
+		elementIndex = elementIndex + endIndex + 1
 	}
 
-	return elementIndex
+	return elementIndex + 1
 }
 
-func (m Message) parseContent(index int) {
+func (m *Message) parseContent(index int) {
 	if index < len(m.raw) {
 		m.content = m.raw[index:]
 

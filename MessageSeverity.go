@@ -21,3 +21,27 @@ const (
 	//MessageSeverityDebug indicates debug-level messages
 	MessageSeverityDebug
 )
+
+//String returns the string representation of the MessageSeverity
+func (ms MessageSeverity) String() string {
+	switch ms {
+	case MessageSeverityEmergency:
+		return "MessageSeverityEmergency"
+	case MessageSeverityAlert:
+		return "MessageSeverityAlert"
+	case MessageSeverityCritical:
+		return "MessageSeverityCritical"
+	case MessageSeverityError:
+		return "MessageSeverityError"
+	case MessageSeverityWarning:
+		return "MessageSeverityWarning"
+	case MessageSeverityNotice:
+		return "MessageSeverityNotice"
+	case MessageSeverityInformational:
+		return "MessageSeverityInformational"
+	case MessageSeverityDebug:
+		return "MessageSeverityDebug"
+	default:
+		return "Unknown"
+	}
+}
