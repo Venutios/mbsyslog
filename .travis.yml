@@ -8,5 +8,4 @@ os:
 before_install:
   - go get github.com/mattn/goveralls
 script: 
-  - sudo -E env "PATH=$PATH" go test -v
   - sudo -E env "PATH=$PATH" $GOPATH/bin/goveralls -service=travis-ci
