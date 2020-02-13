@@ -5,4 +5,4 @@ go:
   - "1.13.x"
 os:
   - linux
-script: sudo go test -v
+script: sudo -E env "PATH=$PATH" go test -v
