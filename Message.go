@@ -16,7 +16,6 @@ import (
 type Message struct {
 	source         *net.UDPAddr
 	raw            string
-	valid          bool
 	format         MessageFormat
 	priority       int
 	version        int
@@ -40,11 +39,6 @@ func NewMessage(source *net.UDPAddr, data []byte) *Message {
 //Source returns UDP address source of the message
 func (m Message) Source() net.UDPAddr {
 	return *m.source
-}
-
-//Valid returns if the messsage parsing was successful and the message is valid
-func (m Message) Valid() bool {
-	return m.valid
 }
 
 //Format returns the syslog message format of the message
@@ -119,7 +113,6 @@ func (m *Message) parse(data string) {
 	index := 0
 
 	//Assume the parsing will succeed, and set the defaults
-	m.valid = true
 	m.raw = data
 	m.format = MessageFormatSimple
 	m.version = -1
@@ -152,21 +145,15 @@ func (m *Message) parse(data string) {
 				index = m.parseStructuredData(index)
 				m.parseContent(index)
 				m.format = MessageFormatRFC5424
-			} else {
-				m.valid = false
 			}
 		}
-	}
-
-	if !m.valid {
-		m.format = MessageFormatInvalid
 	}
 }
 
 func (m *Message) parsePriority() (int, error) {
-	//No data, the message is not valid
+	//No data, the message format is unknown
 	if len(m.raw) < 1 {
-		m.valid = false
+		m.format = MessageFormatUnknown
 		return 0, errors.New("Invalid data to parse priority")
 	}
 
@@ -182,7 +169,7 @@ func (m *Message) parsePriority() (int, error) {
 	}
 
 	//priority parsing failed
-	m.valid = false
+	m.format = MessageFormatUnknown
 	return 0, errors.New("Failed to parse priority")
 }
 
@@ -243,7 +230,7 @@ func (m *Message) parseDate(index int) (int, error) {
 		}
 	}
 
-	//Attemp the third support date format
+	//Attempt the third support date format
 	formatStr3 := "2006-01-02T15:04:05.000000-07:00"
 	spaceAfterDate = strings.Index(m.raw[index+len(formatStr3):], " ")
 	if spaceAfterDate != -1 {
@@ -297,7 +284,7 @@ func (m *Message) parseApplication(index int) int {
 func (m *Message) parseProcessID(index int) int {
 	//if the current index is invalid, end parsing
 	if len(m.raw) <= index {
-		m.valid = false
+		m.format = MessageFormatUnknown
 		return index
 	}
 
@@ -317,14 +304,14 @@ func (m *Message) parseProcessID(index int) int {
 	}
 
 	//Process ID parsing failed
-	m.valid = false
+	m.format = MessageFormatUnknown
 	return index
 }
 
 func (m *Message) parseMessageID(index int) int {
 	//if the current index is invalid, end parsing
 	if len(m.raw) <= index {
-		m.valid = false
+		m.format = MessageFormatUnknown
 		return index
 	}
 
@@ -340,14 +327,14 @@ func (m *Message) parseMessageID(index int) int {
 		return index + end + 2
 	}
 	//Message ID parsing failed
-	m.valid = false
+	m.format = MessageFormatUnknown
 	return index
 }
 
 func (m *Message) parseStructuredData(index int) int {
 	//if the current index is invalid, end parsing
 	if len(m.raw) <= index {
-		m.valid = false
+		m.format = MessageFormatUnknown
 		return index
 	}
 
@@ -361,9 +348,9 @@ func (m *Message) parseStructuredData(index int) int {
 	//Continue parsing the structured data until there are no more elements
 	for elementIndex < len(m.raw) && m.raw[elementIndex] == '[' {
 		endIndex := strings.Index(m.raw[elementIndex:], "]")
-		//if the end wasn't found, or the data couldnt be parsed, fail
+		//if the end wasn't found, or the data couldnt be parsed
 		if endIndex == -1 || m.structuredData.addElement(m.raw[elementIndex+1:elementIndex+endIndex]) == false {
-			m.valid = false
+			m.format = MessageFormatUnknown
 			return index
 		}
 		elementIndex = elementIndex + endIndex + 1

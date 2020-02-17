@@ -4,8 +4,8 @@ package mbsyslog
 type MessageFormat int
 
 const (
-	//MessageFormatInvalid is an invalid message
-	MessageFormatInvalid MessageFormat = iota
+	//MessageFormatUnknown is a message with no known format
+	MessageFormatUnknown MessageFormat = iota
 	//MessageFormatRFC3164 is an RFC 3164 compliant message
 	MessageFormatRFC3164
 	//MessageFormatRFC5424 is an RFC 5424 compliant message
@@ -17,8 +17,8 @@ const (
 //String returns the string representation of the MessageFormat
 func (mf MessageFormat) String() string {
 	switch mf {
-	case MessageFormatInvalid:
-		return "MessageFormatInvalid"
+	case MessageFormatUnknown:
+		return "MessageFormatUnknown"
 	case MessageFormatRFC3164:
 		return "MessageFormatRFC3164"
 	case MessageFormatRFC5424:

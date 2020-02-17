@@ -19,8 +19,8 @@ type Server struct {
 
 //NewServer prepares the server to listen for messages. The server will listen
 //on port 514 and have an 8KB maximum message size. The message channel will
-//receive all messages received, whether valid or invalid. The channel should
-//not be closed until the server is not running by calling Running().
+//receive all messages received. The channel should not be closed until the
+//server is not running by calling Running().
 func NewServer(messageChan chan<- Message) *Server {
 	result := new(Server)
 	result.port = 514

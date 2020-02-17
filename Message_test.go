@@ -26,30 +26,6 @@ func TestMessage_Source(t *testing.T) {
 	}
 }
 
-func TestMessage_Valid(t *testing.T) {
-	tests := []struct {
-		name string
-		m    mbsyslog.Message
-		want bool
-	}{
-		{"SimpleValid", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<151>The quick brown fox jumps over the lazy dog")), true},
-		{"SimpleInvalid", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<151The quick brown fox jumps over the lazy dog")), false},
-		{"RFC3164Valid", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<3>Nov 10 14:38:52 machineName appName The quick brown fox jumps over the lazy dog")), true},
-		{"RFC3164Invalid", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<3Nov 10 14:38:52 machineName appName The quick brown fox jumps over the lazy dog")), false},
-		{"RFC5424Valid1", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47 - BOM'su root' failed for lonvick on /dev/pts/8")), true},
-		{"RFC5424Valid2", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<165>1 2003-08-24T05:14:15.000003-07:00 192.0.2.1 myproc 8710 - - %% It's time to make the do-nuts.")), true},
-		{"RFC5424Valid3", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut=\"3\" eventSource=\"Application\" eventID=\"1011\"] BOMAn application event log entry...")), true},
-		{"RFC5424Valid4", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut=\"3\" eventSource=\"Application\" eventID=\"1011\"][examplePriority@32473 class=\"high\"]")), true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.m.Valid(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Message.Valid() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestMessage_Format(t *testing.T) {
 	tests := []struct {
 		name string
@@ -57,9 +33,9 @@ func TestMessage_Format(t *testing.T) {
 		want mbsyslog.MessageFormat
 	}{
 		{"SimpleValid", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<151>The quick brown fox jumps over the lazy dog")), mbsyslog.MessageFormatSimple},
-		{"SimpleInvalid", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<151The quick brown fox jumps over the lazy dog")), mbsyslog.MessageFormatInvalid},
+		{"SimpleInvalid", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<151The quick brown fox jumps over the lazy dog")), mbsyslog.MessageFormatUnknown},
 		{"RFC3164Valid", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<3>Nov 10 14:38:52 machineName appName The quick brown fox jumps over the lazy dog")), mbsyslog.MessageFormatRFC3164},
-		{"RFC3164Invalid", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<3Nov 10 14:38:52 machineName appName The quick brown fox jumps over the lazy dog")), mbsyslog.MessageFormatInvalid},
+		{"RFC3164Invalid", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<3Nov 10 14:38:52 machineName appName The quick brown fox jumps over the lazy dog")), mbsyslog.MessageFormatUnknown},
 		{"RFC5424Valid1", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47 - BOM'su root' failed for lonvick on /dev/pts/8")), mbsyslog.MessageFormatRFC5424},
 		{"RFC5424Valid2", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<165>1 2003-08-24T05:14:15.000003-07:00 192.0.2.1 myproc 8710 - - %% It's time to make the do-nuts.")), mbsyslog.MessageFormatRFC5424},
 		{"RFC5424Valid3", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut=\"3\" eventSource=\"Application\" eventID=\"1011\"] BOMAn application event log entry...")), mbsyslog.MessageFormatRFC5424},
@@ -302,10 +278,8 @@ func TestMessage_String(t *testing.T) {
 	}{
 		{"SimpleValid", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<151>The quick brown fox jumps over the lazy dog")), "127.0.0.1 " + "<151>The quick brown fox jumps over the lazy dog"},
 		{"RFC3164Valid", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<3>Nov 10 14:38:52 machineName appName The quick brown fox jumps over the lazy dog")), "127.0.0.1 " + "<3>Nov 10 14:38:52 machineName appName The quick brown fox jumps over the lazy dog"},
-		{"RFC5424Valid1", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47 - BOM'su root' failed for lonvick on /dev/pts/8")), "127.0.0.1 " + "<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47 - BOM'su root' failed for lonvick on /dev/pts/8"},
-		{"RFC5424Valid2", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<165>1 2003-08-24T05:14:15.000003-07:00 192.0.2.1 myproc 8710 - - %% It's time to make the do-nuts.")), "127.0.0.1 " + "<165>1 2003-08-24T05:14:15.000003-07:00 192.0.2.1 myproc 8710 - - %% It's time to make the do-nuts."},
-		{"RFC5424Valid3", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut=\"3\" eventSource=\"Application\" eventID=\"1011\"] BOMAn application event log entry...")), "127.0.0.1 " + "<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut=\"3\" eventSource=\"Application\" eventID=\"1011\"] BOMAn application event log entry..."},
-		{"RFC5424Valid4", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut=\"3\" eventSource=\"Application\" eventID=\"1011\"][examplePriority@32473 class=\"high\"]")), "127.0.0.1 " + "<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut=\"3\" eventSource=\"Application\" eventID=\"1011\"][examplePriority@32473 class=\"high\"]"},
+		{"RFC5424Valid1", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut=\"3\" eventSource=\"Application\" eventID=\"1011\"] BOMAn application event log entry...")), "127.0.0.1 " + "<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut=\"3\" eventSource=\"Application\" eventID=\"1011\"] BOMAn application event log entry..."},
+		{"RFC5424Valid2", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut=\"3\" eventSource=\"Application\" eventID=\"1011\"][examplePriority@32473 class=\"high\"]")), "127.0.0.1 " + "<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut=\"3\" eventSource=\"Application\" eventID=\"1011\"][examplePriority@32473 class=\"high\"]"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
