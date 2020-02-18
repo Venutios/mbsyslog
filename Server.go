@@ -58,11 +58,14 @@ func (s *Server) Listen() error {
 			conn.SetDeadline(time.Now().Add(1 * time.Second))
 			count, addr, err := conn.ReadFromUDP(buffer)
 			if err == nil {
+				//copy of the buffer, so it doesn't change while the goroutine runs
+				data := make([]byte, count)
+				copy(data, buffer)
 				wg.Add(1)
 				go func(data []byte) {
 					defer wg.Done()
 					s.messagesOut <- *NewMessage(addr, data)
-				}(buffer[0:count])
+				}(data)
 			}
 		}
 	}
