@@ -16,6 +16,7 @@ func TestMessageSeverity_String(t *testing.T) {
 		{"MessageSeverityNotice", MessageSeverityNotice, "MessageSeverityNotice"},
 		{"MessageSeverityInformational", MessageSeverityInformational, "MessageSeverityInformational"},
 		{"MessageSeverityDebug", MessageSeverityDebug, "MessageSeverityDebug"},
+		{"MessageSeverityUnknown", 392, "Unknown"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -62,6 +62,7 @@ func TestMessage_Priority(t *testing.T) {
 		{"RFC5424Valid2", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<165>1 2003-08-24T05:14:15.000003-07:00 192.0.2.1 myproc 8710 - - %% It's time to make the do-nuts.")), 165},
 		{"RFC5424Valid3", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut=\"3\" eventSource=\"Application\" eventID=\"1011\"] BOMAn application event log entry...")), 165},
 		{"RFC5424Valid4", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut=\"3\" eventSource=\"Application\" eventID=\"1011\"][examplePriority@32473 class=\"high\"]")), 165},
+		{"Empty", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("")), 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -128,6 +129,7 @@ func TestMessage_Version(t *testing.T) {
 		{"RFC5424Valid2", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<165>1 2003-08-24T05:14:15.000003-07:00 192.0.2.1 myproc 8710 - - %% It's time to make the do-nuts.")), 1},
 		{"RFC5424Valid3", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut=\"3\" eventSource=\"Application\" eventID=\"1011\"] BOMAn application event log entry...")), 1},
 		{"RFC5424Valid4", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut=\"3\" eventSource=\"Application\" eventID=\"1011\"][examplePriority@32473 class=\"high\"]")), 1},
+		{"Invalid", *mbsyslog.NewMessage(&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, []byte("<34>A 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47 - BOM'su root' failed for lonvick on /dev/pts/8")), -1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

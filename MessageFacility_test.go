@@ -32,6 +32,7 @@ func TestMessageFacility_String(t *testing.T) {
 		{"MessageFacilityLocal5", MessageFacilityLocal5, "MessageFacilityLocal5"},
 		{"MessageFacilityLocal6", MessageFacilityLocal6, "MessageFacilityLocal6"},
 		{"MessageFacilityLocal7", MessageFacilityLocal7, "MessageFacilityLocal7"},
+		{"MessageFacilityUnknown", 489, "Unknown"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
