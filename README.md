@@ -1,7 +1,8 @@
 mbSyslog
 ========
 [![Build Status](https://travis-ci.com/Venutios/mbsyslog.svg?branch=master)](https://travis-ci.com/Venutios/mbsyslog)
-<a href='https://coveralls.io/github/Venutios/mbsyslog?branch=master'><img src='https://coveralls.io/repos/github/Venutios/mbsyslog/badge.svg?branch=master' alt='Coverage Status' /></a>
+.. image:: https://coveralls.io/repos/github/Venutios/mbsyslog/badge.svg?branch=master
+:target: https://coveralls.io/github/Venutios/mbsyslog?branch=master
 [![Go Report Card](https://goreportcard.com/badge/github.com/Venutios/mbsyslog)](https://goreportcard.com/report/github.com/Venutios/mbsyslog)
 
 An implementation of a Syslog server (RFC3164 and RFC5424) in Go.
